@@ -1,7 +1,6 @@
 # JSON API для сайта объявлений
 
-Язык - Golang.    
-СУБД - MySQL
+Язык - Golang, СУБД - MySQL
 
 ### Методы
 |Метод HTTP|URL|Действие|
