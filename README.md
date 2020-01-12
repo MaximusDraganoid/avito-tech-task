@@ -35,3 +35,4 @@ curl --header "Content-Type: application/json" --request GET --data '{"page_num"
 curl --header "Content-Type: application/json" --request GET --data '{"ad_id":"1"}' http://localhost:8080/getAdById
 curl --header "Content-Type: application/json" --request GET --data '{"ad_id":"1"}' http://localhost:8080/getAdById?fields=1
 ```
+Дамп базы данных прилагается.
