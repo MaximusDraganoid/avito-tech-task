@@ -1,8 +1,4 @@
-# avito-tech-task
-
 # JSON API для сайта объявлений
-
-## Дизайн сервиса
 
 Язык - Golang.    
 СУБД - MySQL
