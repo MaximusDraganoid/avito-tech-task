@@ -36,3 +36,4 @@ curl --header "Content-Type: application/json" --request GET --data '{"ad_id":"1
 curl --header "Content-Type: application/json" --request GET --data '{"ad_id":"1"}' http://localhost:8080/getAdById?fields=1
 ```
 Дамп базы данных прилагается.
+При передаче лишних параметров в тело json, они будут просто игнорироваться.
