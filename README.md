@@ -37,3 +37,5 @@ curl --header "Content-Type: application/json" --request GET --data '{"ad_id":"1
 ```
 Дамп базы данных прилагается.
 При передаче лишних параметров в тело json, они будут просто игнорироваться.
+
+В качестве драйвера драйвера для взаимодействия с MySQL пакет github.com/go-sql-driver/mysql.
