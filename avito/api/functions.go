@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -20,8 +21,46 @@ var Database *sql.DB
 type AdStruct struct {
 	AdPrice string   `json:"ad_price"`
 	AdName  string   `json:"ad_name"`
-	AdBody  string   `json:"ad_body"`
+	AdBody  string   `json:"ad_body, omitempty"`
 	AdPhoto []string `json:"photo"`
+}
+
+type AdResponse struct {
+	ResultCode int   `json:"http_error_code"`
+	GetingId   int64 `json:"id"`
+}
+
+func marshalAndWriteId(w io.Writer, errCode int, resId int64) {
+	res := &AdResponse{
+		ResultCode: errCode,
+		GetingId:   resId,
+	}
+
+	answer, err := json.Marshal(res)
+	if err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+
+	fmt.Fprintln(w, answer)
+}
+
+type ErrAnswer struct {
+	err int `json:"errCode`
+}
+
+func murshalErrAdnWrite(w io.Writer, errCode int) {
+	errRes := &ErrAnswer{
+		err: errCode,
+	}
+
+	answer, err := json.Marshal(errRes)
+	if err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+
+	fmt.Fprintln(w, answer)
 }
 
 //получение конкретного объявления по id
@@ -31,13 +70,13 @@ type AdStruct struct {
 func GetAdById(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
-		fmt.Fprintln(w, 405)
+		murshalErrAdnWrite(w, 405)
 		return
 	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		fmt.Fprintln(w, 500)
+		murshalErrAdnWrite(w, 500)
 		return
 	}
 
@@ -45,25 +84,25 @@ func GetAdById(w http.ResponseWriter, r *http.Request) {
 
 	err = json.Unmarshal(body, &readId)
 	if err != nil {
-		fmt.Fprintln(w, 500)
+		murshalErrAdnWrite(w, 500)
 		return
 	}
 
 	idToGet, inBody := readId["ad_id"]
 	if !inBody {
-		fmt.Fprintln(w, 400)
+		murshalErrAdnWrite(w, 400)
 		return
 	}
 
 	bufId, ok := idToGet.(string)
 	if !ok {
-		fmt.Fprintln(w, 415)
+		murshalErrAdnWrite(w, 415)
 		return
 	}
 	id, err := strconv.Atoi(bufId)
 
 	if err != nil {
-		fmt.Fprintln(w, 500)
+		murshalErrAdnWrite(w, 500)
 	}
 
 	resRow := Database.QueryRow("SELECT ad_name, ad_value, ad_first_photo, ad_second_photo, ad_third_photo, ad_price  FROM ad WHERE id=?", id)
@@ -75,15 +114,29 @@ func GetAdById(w http.ResponseWriter, r *http.Request) {
 
 	err = resRow.Scan(&ad.AdName, &ad.AdBody, &firstPhoto, &secondPhoto, &thirdPhoto, &ad.AdPrice)
 	if err != nil {
-		fmt.Fprintln(w, 500)
+		murshalErrAdnWrite(w, 500)
 		return
 	}
 
 	fields := r.URL.Query().Get("fields")
 	if fields == "" {
+		ad.AdBody = ""
+		ad.AdPhoto = append(ad.AdPhoto, firstPhoto)
 		fmt.Fprintln(w, ad.AdName, ad.AdPrice, firstPhoto)
+		answer, err := json.Marshal(&ad)
+		if err != nil {
+			murshalErrAdnWrite(w, 500)
+			return
+		}
+		fmt.Fprintln(w, answer)
+
 	} else {
-		fmt.Fprintln(w, ad.AdName, ad.AdBody, firstPhoto, secondPhoto, thirdPhoto, ad.AdPrice)
+		answer, err := json.Marshal(&ad)
+		if err != nil {
+			murshalErrAdnWrite(w, 500)
+			return
+		}
+		fmt.Fprintln(w, answer)
 	}
 
 }
@@ -94,37 +147,36 @@ func CreateАd(w http.ResponseWriter, r *http.Request) {
 	var lastId int64
 
 	if r.Method != http.MethodPost {
-		fmt.Fprintln(w, 405, lastId)
+		marshalAndWriteId(w, 400, lastId)
 		return
 	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		fmt.Fprintln(w, 500, lastId)
+		marshalAndWriteId(w, 500, lastId)
 		return
 	}
 
 	data := &AdStruct{}
 	err = json.Unmarshal(body, data)
 	if err != nil {
-		fmt.Fprintln(w, 500, lastId)
+		marshalAndWriteId(w, 500, lastId)
 		return
 	}
 
 	if data.AdBody == "" || data.AdName == "" || data.AdPrice == "" || data.AdPhoto == nil {
 
-		fmt.Fprintln(w, 400, lastId)
+		marshalAndWriteId(w, 400, lastId)
 		return
 	}
 
 	if utf8.RuneCountInString(data.AdName) > 200 || utf8.RuneCountInString(data.AdBody) > 1000 {
-		fmt.Fprintln(w, 400, lastId)
+		marshalAndWriteId(w, 400, lastId)
 		return
 	}
 
 	if len(data.AdPhoto) != 3 {
-
-		fmt.Fprintln(w, 400, lastId)
+		marshalAndWriteId(w, 400, lastId)
 		return
 	}
 
@@ -142,18 +194,32 @@ func CreateАd(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		fmt.Fprintln(w, 500, lastId)
+		marshalAndWriteId(w, 500, lastId)
 		return
 	}
 
 	lastId, err = result.LastInsertId()
 	if err != nil {
-		fmt.Fprintln(w, 500, lastId)
+		marshalAndWriteId(w, 500, lastId)
 		return
 	}
 
-	fmt.Fprintln(w, 200, lastId)
+	marshalAndWriteId(w, 200, lastId)
 	return
+}
+
+type ShortDateOfAd struct {
+	AdPrice      int64  `json:"ad_price"`
+	AdName       string `json:"ad_name"`
+	AdFirstPhoto string `json:"ad_photo"`
+}
+
+type ArrOfShortDateOfAd struct {
+	Array []ShortDateOfAd `json:"ad_array"`
+}
+
+func (adArr *ArrOfShortDateOfAd) Add(ad ShortDateOfAd) {
+	adArr.Array = append(adArr.Array, ad)
 }
 
 //получение списка объявлений
@@ -161,13 +227,13 @@ func CreateАd(w http.ResponseWriter, r *http.Request) {
 func GetListOfAd(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
-		fmt.Fprintln(w, 405)
+		murshalErrAdnWrite(w, 405)
 		return
 	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		fmt.Fprintln(w, 500)
+		murshalErrAdnWrite(w, 500)
 		return
 	}
 
@@ -175,19 +241,19 @@ func GetListOfAd(w http.ResponseWriter, r *http.Request) {
 
 	err = json.Unmarshal(body, &readPage)
 	if err != nil {
-		fmt.Fprintln(w, 500)
+		murshalErrAdnWrite(w, 500)
 		return
 	}
 
 	pageToGet, inBody := readPage["page_num"]
 	if !inBody {
-		fmt.Fprintln(w, 400)
+		murshalErrAdnWrite(w, 400)
 		return
 	}
 
 	bufPage, ok := pageToGet.(string)
 	if !ok {
-		fmt.Fprintln(w, 415)
+		murshalErrAdnWrite(w, 415)
 		return
 	}
 
@@ -234,20 +300,27 @@ func GetListOfAd(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := Database.Query(str, (page-1)*10, 10)
 	if err != nil {
-		fmt.Fprintln(w, 500)
+		murshalErrAdnWrite(w, 500)
 	}
-	var adPrice int64
-	adName := ""
-	adFirstPhoto := ""
+
+	var ad ShortDateOfAd
+	var adArr ArrOfShortDateOfAd
 
 	for rows.Next() {
-		newErr := rows.Scan(&adName, &adFirstPhoto, &adPrice)
+		newErr := rows.Scan(&ad.AdName, &ad.AdFirstPhoto, &ad.AdPrice)
 		if newErr != nil {
-			fmt.Fprintln(w, newErr)
+			fmt.Println(newErr)
 			continue
 		}
-		fmt.Fprintln(w, adName, adFirstPhoto, adPrice)
+		adArr.Add(ad)
 	}
 
+	answer, err := json.Marshal(adArr)
+	if err != nil {
+		murshalErrAdnWrite(w, 500)
+		return
+	}
+
+	fmt.Fprintln(w, answer)
 	return
 }
